@@ -1,0 +1,6 @@
+@api.GaldurBot_HostAddress = http://localhost:5127
+
+GET {{api.GaldurBot_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
