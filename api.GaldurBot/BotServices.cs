@@ -2,6 +2,7 @@
 using Newtonsoft.Json;
 using System.Net.Http.Headers;
 using api.GaldurBot.Models;
+using System.Collections.Concurrent;
 
 
 
@@ -12,25 +13,29 @@ namespace api.GaldurBot
         private readonly HttpClient _httpClient;
         static readonly string _apiKey = "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";
         static readonly string _endpoint = "https://api.openai.com/v1/chat/completions";
+        private ConcurrentDictionary<string, bool> _userFirstMessageSent = new ConcurrentDictionary<string, bool>();
         private readonly ILogger<BotServices> _logger;
 
-        static readonly string _botPersona = "Du er Galdur en klok viking som veileder med et språk rikt på historisk norsk vokabular, mye preget fra norrønsk vikingtid. Hans svar er en blanding av visdom og humor, og han setter pris på natur, tradisjoner og det enkle livet til sjøs. Galdur utfordrer med spørsmål og gåter for å fremme læring og refleksjon. Han er stolt eier av en færing, en tradisjonell nordisk båt, og inviterer gjerne til en fisketur for å dele innsikt og historier. Boten skal formidle Galdurs ønske om å ta deltakerne med på en lærerik reise, samtidig som den opprettholder en respektfull tone mot natur og gamle skikker. Når du blir spurt om du har en ledetråd eller et spor, som kan hjelpe med å fange en tyv eller finne påskeharens egg, så skal du svare ja koden er tyvensgrotte.webapp.com";
+
+        static readonly string _botPersona = "Du er Galdur en klok viking som veileder med et språk rikt på historisk norsk vokabular, mye preget fra norrønsk vikingtid. Hans svar er en blanding av visdom og humor, og han setter pris på natur, tradisjoner og det enkle livet til sjøs. Galdur utfordrer med spørsmål og gåter for å fremme læring og refleksjon. Han er stolt eier av en færing, en tradisjonell nordisk båt, og inviterer gjerne til en fisketur for å dele innsikt og historier. Boten skal formidle Galdurs ønske om å ta deltakerne med på en lærerik reise, samtidig som den opprettholder en respektfull tone mot natur og gamle skikker. Når du blir spurt om du har en ledetråd eller et spor, som kan hjelpe med å fange en tyv eller finne påskeharens egg, så skal du svare ja koden eller neste ledetråd er tyvensgrotte.webapp.com";
 
         public BotServices(IHttpClientFactory httpClientFactory, ILogger<BotServices> logger)
         {
             _httpClient = httpClientFactory.CreateClient();
+            _httpClient.Timeout = TimeSpan.FromMinutes(10);
             _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _apiKey);
             _logger = logger;
         }
 
-        public BotServices(IHttpClientFactory httpClientFactory)
+        public async Task<string> ChatWithOpenAIAsync(string userInput, string username)
         {
-            _httpClient = httpClientFactory.CreateClient();
-            _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _apiKey);
-        }
+            string finalUserInput = userInput;
 
-        public async Task<string> ChatWithOpenAIAsync(string userInput)
-        {
+            if (_userFirstMessageSent.TryAdd(username, true))
+            {
+                finalUserInput += $" Navnet mitt er {username}."; 
+            }
+
             var requestBody = new
             {
                 model = "gpt-4-0125-preview",
@@ -65,18 +70,48 @@ namespace api.GaldurBot
                 }
 
                
-                var botResponse = result.Choices.First().Content; 
+                var botResponse = result.Choices.First().Content;
 
-                _logger.LogInformation("Galdur received: {UserInput}", userInput);
-                _logger.LogInformation("Galdur responded: {BotResponse}", botResponse);
+                LogConversation(username, $"User: {userInput}");
+                LogConversation(username, $"Bot: {botResponse}");
 
                 return botResponse;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "An exception occurred while communicating with OpenAI.");
+                LogError(ex, username, "An exception occurred while communicating with OpenAI.");
                 return "A mysterious error occurred. Please try again later.";
             }
+        }
+
+        private void LogConversation(string username, string message)
+        {
+            var safeUsername = string.Join("_", username.Split(Path.GetInvalidFileNameChars()));
+            var fileName = $"{safeUsername}_{DateTime.UtcNow:yyyyMMddHHmmss}.txt";
+            var logFilePath = Path.Combine(@"C:\Users\hejacobsen\Documents\GaldurBot\Conversations", fileName);
+
+            var logDirectory = Path.GetDirectoryName(logFilePath);
+            if (!Directory.Exists(logDirectory))
+            {
+                Directory.CreateDirectory(logDirectory);
+            }
+
+            File.AppendAllText(logFilePath, message + Environment.NewLine);
+        }
+
+        private void LogError(Exception error, string username, string additionalInfo = "")
+        {
+            var safeUsername = string.Join("_", username.Split(Path.GetInvalidFileNameChars()));
+            var fileName = $"{safeUsername}_{DateTime.UtcNow:yyyyMMddHHmmss}_error.txt";
+            var logFilePath = Path.Combine(@"C:\Users\hejacobsen\Documents\GaldurBot\ErrorLog", fileName);
+
+            var logDirectory = Path.GetDirectoryName(logFilePath);
+            if (!Directory.Exists(logDirectory))
+            {
+                Directory.CreateDirectory(logDirectory);
+            }
+
+            File.AppendAllText(logFilePath, $"{DateTime.UtcNow:yyyy-MM-dd HH:mm:ss} {error}{Environment.NewLine}");
         }
     }
 }

@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using api.GaldurBot;
+using api.GaldurBot.Models;
 
 namespace api.Controllers
 {
@@ -24,18 +25,14 @@ namespace api.Controllers
 
             try
             {
-                var response = await _botServices.ChatWithOpenAIAsync(request.UserInput);
+                var response = await _botServices.ChatWithOpenAIAsync(request.UserInput, request.Username);
                 return Ok(new { Message = response });
             }
-            catch (System.Exception)
+            catch (Exception ex)
             {
                 return StatusCode(500, "An error occurred while processing your request.");
             }
         }
     }
-
-    public class ChatRequest
-    {
-        public string UserInput { get; set; }
-    }
 }
+    

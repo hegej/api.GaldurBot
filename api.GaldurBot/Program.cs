@@ -6,7 +6,6 @@ var builder = WebApplication.CreateBuilder(args);
 
 Log.Logger = new LoggerConfiguration()
     .MinimumLevel.Debug()
-    .WriteTo.File("logs/conversations.txt", rollingInterval: RollingInterval.Day)
     .WriteTo.Logger(lc => lc
         .Filter.ByIncludingOnly(e => e.Level == LogEventLevel.Error)
         .WriteTo.File("logs/errors.txt", rollingInterval: RollingInterval.Day))
