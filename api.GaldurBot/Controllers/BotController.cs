@@ -18,14 +18,14 @@ namespace api.Controllers
         [HttpPost("chat")]
         public async Task<IActionResult> Chat([FromBody] ChatRequest request)
         {
-            if (request == null || string.IsNullOrWhiteSpace(request.UserInput))
+            if (request == null || string.IsNullOrWhiteSpace(request.userInput))
             {
                 return BadRequest("Invalid input");
             }
 
             try
             {
-                var response = await _botServices.ChatWithOpenAIAsync(request.UserInput, request.Username);
+                var response = await _botServices.ChatWithOpenAIAsync(request.sessionId, request.userInput, request.username);
                 return Ok(new { Message = response });
             }
             catch (Exception ex)

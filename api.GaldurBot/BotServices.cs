@@ -27,18 +27,12 @@ namespace api.GaldurBot
             _logger = logger;
         }
 
-        public async Task<string> ChatWithOpenAIAsync(string userInput, string username)
+        public async Task<string> ChatWithOpenAIAsync(string userInput, string username, string sessionId)
         {
-            string finalUserInput = userInput;
-
-            if (_userFirstMessageSent.TryAdd(username, true))
-            {
-                finalUserInput += $" Navnet mitt er {username}."; 
-            }
-
             var requestBody = new
             {
                 model = "gpt-4-0125-preview",
+                session_id = sessionId,
                 messages = new[]
                 {
                     new { role = "system", content = _botPersona },
@@ -63,31 +57,51 @@ namespace api.GaldurBot
                 var responseBody = await response.Content.ReadAsStringAsync();
                 var result = JsonConvert.DeserializeObject<OpenAIResponse>(responseBody);
 
-                if (result == null || result.Choices == null || result.Choices.Any(c => c.Content == null))
+                if (result == null || result.choices == null || result.choices.Any(c => c.message == null))
                 {
                     _logger.LogError("Received an unexpected null content from OpenAI.");
                     throw new InvalidOperationException("Invalid response content received from OpenAI.");
                 }
 
-               
-                var botResponse = result.Choices.First().Content;
+                string botResponse = result.choices[0].message?.content;
+                if (botResponse == null)
+                {
+                    _logger.LogError("Received an unexpected null content from OpenAI.");
+                    throw new InvalidOperationException("Invalid response content received from OpenAI.");
+                }
 
-                LogConversation(username, $"User: {userInput}");
-                LogConversation(username, $"Bot: {botResponse}");
+                LogConversation(sessionId, username, $"User: {userInput}");
+                LogConversation(sessionId, username, $"Bot: {botResponse}");
 
                 return botResponse;
+            }
+            catch (TaskCanceledException ex)
+            {
+                LogError(ex, username, "The request to OpenAI timed out.");
+                return "The request timed out. Please try again later.";
+            }
+            catch (HttpRequestException ex)
+            {
+                LogError(ex, username, "A network error occurred while communicating with OpenAI.");
+                return "A network error occurred. Please check your connection and try again.";
+            }
+            catch (JsonException ex)
+            {
+                LogError(ex, username, "An error occurred while processing the response from OpenAI.");
+                return "An error occurred. Please try again later.";
             }
             catch (Exception ex)
             {
                 LogError(ex, username, "An exception occurred while communicating with OpenAI.");
                 return "A mysterious error occurred. Please try again later.";
             }
+
         }
 
-        private void LogConversation(string username, string message)
+        private void LogConversation(string sessionId, string username, string message)
         {
             var safeUsername = string.Join("_", username.Split(Path.GetInvalidFileNameChars()));
-            var fileName = $"{safeUsername}_{DateTime.UtcNow:yyyyMMddHHmmss}.txt";
+            var fileName = $"{safeUsername}_{sessionId}.txt";
             var logFilePath = Path.Combine(@"C:\Users\hejacobsen\Documents\GaldurBot\Conversations", fileName);
 
             var logDirectory = Path.GetDirectoryName(logFilePath);

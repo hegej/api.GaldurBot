@@ -2,7 +2,8 @@
 {
     public class ChatRequest
     {
-        public string UserInput { get; set; }
-        public string Username { get; set; }
+        public string userInput { get; set; }
+        public string username { get; set; }
+        public string sessionId { get; set; }
     }
 }
