@@ -1,8 +1,8 @@
-﻿using System.Text;
+﻿using api.GaldurBot.Models;
 using Newtonsoft.Json;
-using System.Net.Http.Headers;
-using api.GaldurBot.Models;
 using System.Collections.Concurrent;
+using System.Net.Http.Headers;
+using System.Text;
 
 
 
@@ -13,7 +13,8 @@ namespace api.GaldurBot
         private readonly HttpClient _httpClient;
         static readonly string _apiKey = "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";
         static readonly string _endpoint = "https://api.openai.com/v1/chat/completions";
-        private ConcurrentDictionary<string, bool> _userFirstMessageSent = new ConcurrentDictionary<string, bool>();
+        private ConcurrentDictionary<string, Queue<Message>> _messageQueues = new ConcurrentDictionary<string, Queue<Message>>();
+
         private readonly ILogger<BotServices> _logger;
 
 
@@ -27,17 +28,31 @@ namespace api.GaldurBot
             _logger = logger;
         }
 
-        public async Task<string> ChatWithOpenAIAsync(string userInput, string username, string sessionId)
+        public async Task<string> ChatWithOpenAIAsync(string sessionId, string userInput, string username)
         {
+            // Add the new user message to the queue
+            if (!_messageQueues.ContainsKey(sessionId))
+            {
+                _messageQueues[sessionId] = new Queue<Message>();
+            }
+            _messageQueues[sessionId].Enqueue(new Message { Role = "user", Content = userInput });
+
+            // Prepare the messages for the requestBody
+            var messages = new List<object>
+            {
+                new { role = "system", content = _botPersona },
+                new { role = "user", content = username }
+            };
+
+            foreach (var message in _messageQueues[sessionId])
+            {
+                messages.Add(new { role = message.Role, content = message.Content });
+            }
+
             var requestBody = new
             {
                 model = "gpt-4-0125-preview",
-                session_id = sessionId,
-                messages = new[]
-                {
-                    new { role = "system", content = _botPersona },
-                    new { role = "user", content = userInput }
-                },
+                messages = messages.ToArray(),
                 temperature = 0.2,
                 top_p = 0.1,
             };
@@ -63,11 +78,20 @@ namespace api.GaldurBot
                     throw new InvalidOperationException("Invalid response content received from OpenAI.");
                 }
 
-                string botResponse = result.choices[0].message?.content;
+                string botResponse = result.choices[0].message?.Content;
                 if (botResponse == null)
                 {
                     _logger.LogError("Received an unexpected null content from OpenAI.");
                     throw new InvalidOperationException("Invalid response content received from OpenAI.");
+                }
+
+                // Add the bot's response to the queue
+                _messageQueues[sessionId].Enqueue(new Message { Role = "assistant", Content = botResponse });
+
+                // Remove the oldest message if there are more than 10 messages
+                while (_messageQueues[sessionId].Count > 10)
+                {
+                    _messageQueues[sessionId].Dequeue();
                 }
 
                 LogConversation(sessionId, username, $"User: {userInput}");
