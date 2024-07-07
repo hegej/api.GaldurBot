@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using api.GaldurBot;
+using api.GaldurBot.Models;
 
 namespace api.Controllers
 {
@@ -17,25 +18,21 @@ namespace api.Controllers
         [HttpPost("chat")]
         public async Task<IActionResult> Chat([FromBody] ChatRequest request)
         {
-            if (request == null || string.IsNullOrWhiteSpace(request.UserInput))
+            if (request == null || string.IsNullOrWhiteSpace(request.userInput))
             {
                 return BadRequest("Invalid input");
             }
 
             try
             {
-                var response = await _botServices.ChatWithOpenAIAsync(request.UserInput);
+                var response = await _botServices.ChatWithOpenAIAsync(request.sessionId, request.userInput, request.username);
                 return Ok(new { Message = response });
             }
-            catch (System.Exception)
+            catch (Exception ex)
             {
                 return StatusCode(500, "An error occurred while processing your request.");
             }
         }
     }
-
-    public class ChatRequest
-    {
-        public string UserInput { get; set; }
-    }
 }
+    

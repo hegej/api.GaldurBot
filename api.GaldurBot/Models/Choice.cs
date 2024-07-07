@@ -2,7 +2,6 @@
 {
     public class Choice
     {
-        public string Message { get; set; }
-        public string Content { get; set; }
+        public Message message { get; set; }
     }
 }

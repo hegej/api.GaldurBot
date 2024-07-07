@@ -2,6 +2,6 @@
 {
     public class OpenAIResponse
     {
-        public List<Choice> Choices { get; set; }
+        public List<Choice> choices { get; set; }
     }
 }
