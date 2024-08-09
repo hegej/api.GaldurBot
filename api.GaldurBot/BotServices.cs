@@ -11,7 +11,7 @@ namespace api.GaldurBot
     public class BotServices
     {
         private readonly HttpClient _httpClient;
-        static readonly string _apiKey = "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";
+        static readonly string _apiKey = "API-KEY";
         static readonly string _endpoint = "https://api.openai.com/v1/chat/completions";
         private ConcurrentDictionary<string, Queue<Message>> _messageQueues = new ConcurrentDictionary<string, Queue<Message>>();
 
@@ -37,7 +37,7 @@ namespace api.GaldurBot
             }
             _messageQueues[sessionId].Enqueue(new Message { Role = "user", Content = userInput });
 
-            // Prepare the messages for the requestBody
+            // Prepare messages for the requestBody
             var messages = new List<object>
             {
                 new { role = "system", content = _botPersona },
@@ -85,7 +85,6 @@ namespace api.GaldurBot
                     throw new InvalidOperationException("Invalid response content received from OpenAI.");
                 }
 
-                // Add the bot's response to the queue
                 _messageQueues[sessionId].Enqueue(new Message { Role = "assistant", Content = botResponse });
 
                 // Remove the oldest message if there are more than 10 messages
